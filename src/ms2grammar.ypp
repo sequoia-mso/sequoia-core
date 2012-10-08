@@ -1,0 +1,1465 @@
+/*
+ * This file is part of the Sequoia MSO Solver.
+ * 
+ * Copyright 2012 Fernando Sanchez Villamil, Theoretical Computer Science,
+ *                                           RWTH Aachen University
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+/**
+ * @author Fernando Sanchez Villamil
+ */
+%{
+#include "ms2parser.h"
+#include "parse_formula_structure.h"
+
+#define YYERROR_VERBOSE
+#define YYDEBUG 0 /* For debugging */
+
+#define NEW_VARIABLE(string, newVariableName, type) \
+  PVariable* newVariableName = new_variable(string, type, variableCounter++); \
+  free (string); \
+  if (newVariableName == NULL) {YYERROR;}
+
+#define NEW_FREE_VARIABLE(string, newVariableName)					\
+  PVariable* newVariableName = new_free_variable(string, variableCounter++); \
+  free (string); \
+  if (newVariableName == NULL) {YYERROR;}
+
+#define NEW_SET(string, newVariableName, type) \
+  PSet* newVariableName = new_set(string, type, setCounter++); \
+  free (string); \
+  if (newVariableName == NULL) {YYERROR;}
+
+#define NEW_FREE_SET(string, newVariableName) \
+  PSet* newVariableName = new_free_set(string, setCounter++); \
+  free (string); \
+  if (newVariableName == NULL) {YYERROR;}
+
+#define GET_SOMETHING(string, newVariableName, type, function)	\
+  type newVariableName = function(string); \
+  free (string); \
+  if (newVariableName == NULL) {YYERROR;}
+  
+#define GET_VARIABLE(string, newVariableName) \
+  GET_SOMETHING(string, newVariableName, PVariable*, get_variable)
+
+#define GET_SET(string, newVariableName) \
+  GET_SOMETHING(string, newVariableName, PSet*, get_set)
+
+using namespace std;
+
+/*
+ * Function declaration needed for controlling the lexer.
+ */
+void yyerror(const char *error);
+int yylex();
+int yy_scan_string(const char *str);
+void yylex_destroy();
+
+/*
+ * Global variables of the parser.
+ */
+//PFormula* parsingResult;
+list<PFormulaPointer*>* parsingResult = NULL;
+int yyparseReturnValue = -1; // -1 signalizes that the parsing has not ended.
+
+/*
+ * Local Functions.
+ */
+PVariable* new_variable(char* variableName_chr, QUANTIFIER quantifier,
+		       unsigned int id);
+PFreeVariable* new_free_variable(char* variableName_chr, unsigned int id);
+PSet* new_set(char* setName_chr, QUANTIFIER quantifier,
+	     unsigned int id);
+PFreeSet* new_free_set(char* setName_chr, unsigned int id);
+PVariable* get_variable(char* variableName_chr);
+PSet* get_set(char*);
+bool variable_exists (string variableName);
+bool set_exists (string setName);
+void add_level();
+
+void erase_current_level(set<int>& unusedVariables, set<int>& unusedSets);
+PFormula* erase_irrelevants(PFormula* q, set<int>& unusedVariables, set<int>& unusedSets);
+bool is_irrelevant(PQuant* q, set<int>& unusedVariables, set<int>& unusedSets);
+void erase_quant(PQuant* q);
+void collect_free_variables_and_sets();
+
+list<PFormulaPointer*>* parse();
+void initialize_parser();
+void clear_parser();
+void finalize_parser();
+void reset_mappings();
+void find_used_formulas(PFormula* formula, set<struct PFormula*> &usedFormulas);
+
+void print_raw_tree (PFormula* f);
+string print_variable(PFormula* f);
+
+const char* type_string(TYPE type);
+bool is_quant(PFormula* formula);
+
+/*
+ * Global variables of the parser.
+ */
+unsigned int level = 0;
+map<string, struct PVariable*> variableMapping;
+unsigned int variableCounter = 0;
+map<string, struct PSet*> setMapping;
+unsigned int setCounter = 0;
+map<string, struct PFreeVariable*> freeVariableMapping;
+map<string, struct PFreeSet*> freeSetMapping;
+map<int, set<string>* > levelVariableMapping;
+map<int, set<string>* > levelSetMapping;
+
+set<string> usedVariables;
+set<string> usedSets;
+set<string> usedFreeVariables;
+set<string> usedFreeSets;
+
+map<string, struct PFormulaPointer*> formulas;
+
+%}
+
+%locations
+
+%union{
+  char* value; //Used for the name of variables and sets.
+  struct PVariable* variable;
+  struct PSet* set;
+  struct PFormula* formula;
+  struct PQuant* quant;
+  struct PFormulaOperation* negation;
+  struct PFormulaPointer* formula_pointer;
+}
+
+%start ms2
+
+%token ERROR
+
+%token DEFINE
+%token ZERO ONE
+%token OPEN_PAREN CLOSE_PAREN COMMA SEMI_COLON
+%token EXISTENTIAL_QUANTIFIER
+%token UNIVERSAL_QUANTIFIER
+%token ADJACENT 
+%token <value> RELATION //The value is the name of the relation.
+%token IN NOT_IN
+%token <value> SET //The value is the name of the set.
+%token <value> VARIABLE //The value is the name of the variable.
+
+%left EQ NEQ
+%left RSUB SUB
+%left IMPLIES
+%left EQUIV
+%left OR_TOKEN
+%left AND_TOKEN
+%right NEG
+%right UNIVERSAL_QUANTIFIER
+
+%type <formula> truth_value
+%type <variable> variable
+%type <set> set
+%type <quant> single_declaration
+%type <quant> declaration_list
+%type <negation> negation_list
+%type <quant> declaration_beginning;
+%type <formula> formula
+%type <formula_pointer> function_declaration
+%type <value> function_name
+%type <formula_pointer> free_variable_declaration_list_start
+%type <formula_pointer> free_variable_declaration_list
+%type <variable> free_variable_declaration_variable
+%type <set> free_variable_declaration_set
+%type <formula_pointer> function_call_arguments
+%type <formula_pointer> function_argument_list
+%type <variable> function_argument_variable
+%type <set> function_argument_set
+
+//%destructor {free ($$);} <value>
+//%destructor {if ($$->isFree) delete (PFreeVariable*)$$; else delete $$;} <variable>
+//%destructor {if ($$->isFree) delete (PFreeSet*)$$; else delete $$;} <set>
+//%destructor {delete_tree($$);} <*>
+     
+%%
+//Grammar rules
+
+ms2 //Start symbol
+:
+{initialize_parser();} function
+|
+ms2 {initialize_parser();} function
+;
+
+function
+:
+function  SEMI_COLON
+|
+function_declaration
+  {
+    string name($1->name);
+    if (formulas.count(name) > 0) {
+      // Formula is already defined.
+      string error_msg("Function ");
+      error_msg += name;
+      error_msg += " redefined.";
+      yyerror(error_msg.c_str());
+      YYERROR;
+    }
+  } DEFINE formula
+      {
+	// Prepare the parser so that it is able to parser a new function.
+	clear_parser();
+  
+	// Set the parsing result to the last known formula.
+	// If another formula is parsed this pointer will be simply overwritten.
+	string name($1->name);
+	formulas[name] = $1;
+	assert (parsingResult != NULL);
+	parsingResult->push_back($1);
+	formulas[name]->formula = $4;
+
+	// Add the new formula to the known formulas.
+	
+#ifdef DEBUG
+	cout << "'" << name << "' declared. The function has " << formulas[name]->arguments.size()  <<  " arguments." << endl;
+#endif
+      }
+;
+
+function_name
+:
+VARIABLE {$$ = $1;}
+|
+SET {$$ = $1;}
+;
+
+function_declaration
+:
+function_name {$$ = new PFormulaPointer(); $$->name = $1; free($1);}
+|
+function_name OPEN_PAREN CLOSE_PAREN {$$ = new PFormulaPointer(); $$->name = $1; free($1);}
+|
+function_name OPEN_PAREN free_variable_declaration_list_start CLOSE_PAREN {$3->name = $1; $$ = $3; free($1);}
+;
+
+free_variable_declaration_list_start
+:
+free_variable_declaration_variable {$$ = new PFormulaPointer(); $$->push_variable($1);}
+|
+free_variable_declaration_set {$$ = new PFormulaPointer(); $$->push_set($1);}
+|
+free_variable_declaration_variable free_variable_declaration_list {$2->push_variable($1); $$ = $2;}
+|
+free_variable_declaration_set free_variable_declaration_list {$2->push_set($1); $$ = $2;}
+;
+
+free_variable_declaration_list
+:
+COMMA free_variable_declaration_variable {$$ = new PFormulaPointer(); $$->push_variable($2);}
+|
+COMMA free_variable_declaration_set {$$ = new PFormulaPointer(); $$->push_set($2);}
+|
+free_variable_declaration_list COMMA free_variable_declaration_variable {$1->push_variable($3); $$ = $1;}
+|
+free_variable_declaration_list COMMA free_variable_declaration_set {$1->push_set($3); $$ = $1;}
+;
+
+free_variable_declaration_variable
+:
+VARIABLE {NEW_FREE_VARIABLE($1, variable); $$ = new PVariable(variable);}
+;
+
+free_variable_declaration_set
+:
+SET {NEW_FREE_SET($1, set); $$ = new PSet(set);}
+;
+
+truth_value
+:
+/*TODO: Create standard objects for these values.*/
+ZERO {$$ = NULL; yyerror("The symbols '0', '1', 'true' and 'false' are not accepted (yet)."); YYERROR;}
+|
+ONE {$$ = NULL; yyerror("The symbols '0', '1', 'true' and 'false' are not accepted (yet)."); YYERROR;}
+;
+
+variable
+:
+VARIABLE {GET_VARIABLE($1,v1); $$ = v1;}
+;
+
+set
+:
+SET {GET_SET($1,v1); $$ = v1;}
+;
+
+declaration_beginning
+:
+declaration_list OPEN_PAREN 
+{
+  $$ = $1;
+  /*We are one level deeper when it comes to variables.*/
+  add_level();
+}
+;
+
+declaration_list
+:
+/*empty*/ {$$ = NULL;/*Superfluous parentheses case.*/}
+|
+single_declaration declaration_list {$1->formula = $2; $$ = $1;}
+|
+single_declaration negation_list declaration_list 
+{
+  assert ($2 != NULL);
+  $1->formula = $2;
+  PFormulaOperation* last = $2;
+  while (last->formula != NULL) {
+    assert (last->formula->type == NEG_OP);
+    last = (PFormulaOperation*)last->formula;
+  }
+  last->formula = $3;
+  $$ = $1;
+}
+;
+
+negation_list
+:
+NEG {$$ = new PFormulaOperation(NULL, NEG_OP);}
+|
+NEG negation_list {$$ = new PFormulaOperation($2, NEG_OP);}
+;
+
+single_declaration
+:
+EXISTENTIAL_QUANTIFIER VARIABLE 
+{
+  NEW_VARIABLE($2, newVariable, EX_QUANT);
+  PVariablePointer* pointer = new PVariablePointer(new PVariable(newVariable));
+  $$ = new PVariableQuant(pointer, EX_VARIABLE_OP);
+}
+|
+UNIVERSAL_QUANTIFIER VARIABLE 
+{
+  NEW_VARIABLE($2, newVariable, ALL_QUANT);
+  PVariablePointer* pointer = new PVariablePointer(new PVariable(newVariable));
+  $$ = new PVariableQuant(pointer, ALL_VARIABLE_OP);
+}
+|
+EXISTENTIAL_QUANTIFIER SET 
+{
+  NEW_SET($2, newVariable, EX_QUANT);
+  PSetPointer* pointer = new PSetPointer(new PSet(newVariable));
+  $$ = new PSetQuant(pointer, EX_SET_OP);
+}
+|
+UNIVERSAL_QUANTIFIER SET 
+{
+  NEW_SET($2, newVariable, ALL_QUANT);
+  PSetPointer* pointer = new PSetPointer(new PSet(newVariable));
+  $$ = new PSetQuant(pointer, ALL_SET_OP);
+}
+;
+
+function_call_arguments
+:
+/*empty*/ {$$ = new PFormulaPointer();}
+|
+function_argument_variable function_argument_list {$2->push_variable($1); $$ = $2;}
+|
+function_argument_set function_argument_list {$2->push_set($1); $$ = $2;}
+;
+
+function_argument_list
+:
+/*empty*/ {$$ = new PFormulaPointer();}
+|
+function_argument_list COMMA function_argument_variable {$1->push_variable($3); $$ = $1;}
+|
+function_argument_list COMMA function_argument_set {$1->push_set($3); $$ = $1;}
+;
+
+function_argument_variable
+:
+VARIABLE {GET_VARIABLE($1, variable); $$ = variable;}
+;
+
+function_argument_set
+:
+SET {GET_SET($1, set); $$ = set;}
+;
+
+formula
+:
+truth_value
+|
+function_name { // Check if the formula exists.
+                string name($1);
+                if (formulas.count(name) == 0) {
+		  string error_msg = "Function '" + name + "' does not exist.";
+		  yyerror(error_msg.c_str());
+		  YYERROR;
+		} 
+              }  OPEN_PAREN function_call_arguments CLOSE_PAREN
+{
+  $4->name = $1;
+  string name($1);
+  free ($1);
+
+  // Check if the formula exists.
+  if (formulas.count(name) == 0) {
+    string error_msg = "Function '" + name + "' does not exist.";
+    yyerror(error_msg.c_str());
+    YYERROR;
+  }
+
+  // Check if the formula has the correct number of arguments.
+  if (formulas[name]->arguments.size() != $4->arguments.size()) {
+    string error_msg = "Incorrect number of arguments when calling function '" + name + "'";
+    yyerror(error_msg.c_str());
+    YYERROR;
+  }
+
+  // Check if the type of the arguments is consistent with the passed arguments.
+  list<struct PPointer*>::iterator itFormula = formulas[name]->arguments.begin();
+  list<struct PPointer*>::iterator endFormula = formulas[name]->arguments.end();
+  list<struct PPointer*>::iterator itArguments = $4->arguments.begin();
+  //list<struct PPointer*>::iterator endArguments = $4->arguments.end();
+  int arg_counter = 0;
+  for (; itFormula != endFormula; itFormula++, itArguments++) {
+    arg_counter++;
+    if ((*itFormula)->pointer_type != (*itArguments)->pointer_type) {
+      std::stringstream out;
+      out << "Incorrect argument type at the " << arg_counter << ". argument while calling '" << name << "'.";
+      yyerror(out.str().c_str());
+      YYERROR;
+    }
+  }
+
+  $$ = new PFormulaPointer(formulas[name]);
+  list<struct PPointer*>::iterator it = $4->arguments.begin();
+  list<struct PPointer*>::iterator end = $4->arguments.end();
+  set<struct PVariable*> variables;
+  set<struct PSet*> sets;
+  set<struct PFormula*> collectedFormulas;
+  for (;it != end; it++) {
+    ((PFormulaPointer*)$$)->passed_arguments.push_back(*it);
+  }
+
+  delete $4;
+}
+|
+ADJACENT OPEN_PAREN variable COMMA variable CLOSE_PAREN {$$ = new PVariableVariableOperation($3, $5, ADJACENT_OP);}
+|
+RELATION VARIABLE VARIABLE
+{$$ = NULL; free($1); free($2); free($3); yyerror("Support for self-implemented relations is not supported yet."); YYERROR;}
+|
+variable IN set {$$ = new PVariableSetOperation($1, $3, VARIABLE_IN_SET_OP);}
+|
+variable NOT_IN set {$$ = new PVariableSetOperation($1, $3, VARIABLE_NOT_IN_SET_OP);}
+|
+variable EQ variable {$$ = new PVariableVariableOperation($1, $3, EQ_VAR_OP);}
+|
+variable NEQ variable {$$ = new PVariableVariableOperation($1, $3, NEQ_VAR_OP);}
+|
+SET EQ SET {$$ = NULL; free($1); free($3); yyerror("The set operators are not yet permitted in MSO formulas."); YYERROR;}
+|
+SET NEQ SET {$$ = NULL; free($1); free($3); yyerror("The set operators are not yet permitted in MSO formulas."); YYERROR;}
+|
+SET SUB SET {$$ = NULL; free($1); free($3); yyerror("The set operators are not yet permitted in MSO formulas."); YYERROR;}
+|
+SET RSUB SET {$$ = NULL; free($1); free($3); yyerror("The set operators are not yet permitted in MSO formulas."); YYERROR;}
+|
+formula AND_TOKEN formula {$$ = new PFormulaFormulaOperation($1, $3, AND_OP);}
+|
+formula OR_TOKEN formula {$$ = new PFormulaFormulaOperation($1, $3, OR_OP);}
+|
+formula IMPLIES formula {$$ = new PFormulaFormulaOperation($1, $3, IMPLIES_OP);}
+|
+formula EQUIV formula {$$ = new PFormulaFormulaOperation($1, $3, EQUIV_OP);}
+|
+NEG formula {$$ = new PFormulaOperation($2, NEG_OP);}
+|
+declaration_beginning formula CLOSE_PAREN
+{
+  set<int> unusedVariables;
+  set<int> unusedSets;
+  erase_current_level(unusedVariables, unusedSets);
+  PFormula* clean = erase_irrelevants($1, unusedVariables, unusedSets);
+  if (clean != NULL) {
+    $$ = clean;
+    
+    PFormula* lastQuant = clean;
+    PFormula* next = ((PFormulaOperation*)lastQuant)->formula;
+    while (next != NULL) { 
+	lastQuant = next;
+	next = ((PFormulaOperation*)lastQuant)->formula;
+    }
+    
+    ((PFormulaOperation*)lastQuant)->formula = $2;
+    
+  } else {
+    // Superfluous parentheses case.
+    $$ = $2;
+  }
+}
+|
+declaration_beginning CLOSE_PAREN
+{
+  $$ = NULL;
+  set<int> unusedVariables;
+  set<int> unusedSets;
+  erase_current_level(unusedVariables, unusedSets);
+  // PFormula* clean =
+  	erase_irrelevants($1, unusedVariables, unusedSets);
+  yyerror("Empty formulas are not accepted.");
+  YYERROR;
+}
+;
+
+%%
+     
+//Epilogue
+
+void yyerror (const char *error)
+{
+  cerr << "ERROR: " << error;
+  cerr << " At position " << yylloc.first_line << ":" << yylloc.first_column;
+  cerr << endl;
+  cerr.flush();
+}
+
+list<PFormulaPointer*>* parse_formula_from_file(const char* file) {
+  extern FILE *yyin;
+  yyin = fopen( file, "r" );
+  if (yyin == NULL) {
+    std::cerr << "Error opening file: " << file << std::endl;
+    throw "Cannot open formula file";
+  }
+  
+  return parse();
+}
+
+list<PFormulaPointer*>* parse_formula_from_string(const char* ms2string) {
+  yy_scan_string(ms2string);
+  
+  return parse();
+}
+
+list<PFormulaPointer*>* parse() {
+
+  parsingResult = new list<PFormulaPointer*>();
+  
+  try {
+    yyparseReturnValue = yyparse();
+  } catch (int e) {
+    cerr << "Formula could not be parsed." << endl;
+    delete parsingResult;
+    parsingResult = NULL;
+    return NULL;
+  }
+
+#ifdef DEBUG
+  if (yyparseReturnValue == 0) {
+    cout << "Parsing successful." << endl;
+  } else if (yyparseReturnValue == 1){
+    cerr << "Error while parsing the formula." << endl;
+  } else if (yyparseReturnValue == 2){
+    cerr << "Not enough memory to parse the file." << endl;
+  }
+#endif
+
+  finalize_parser();
+  
+  if (yyparseReturnValue == 0) {
+    return parsingResult;
+  } else {
+    return NULL;
+  }
+}
+
+/*
+ * Local functions.
+ */
+PVariable* new_variable(char* variableName_chr, QUANTIFIER quantifier, unsigned int id) {
+  string variableName(variableName_chr);
+  
+  if (variable_exists(variableName)) {
+    string error = "Variable '" + variableName + "' already exists.";
+    yyerror(error.c_str());
+    return NULL;
+  }
+
+  set<string>* currentLevel = levelVariableMapping[level];
+  currentLevel->insert(variableName);
+  PVariable* newVariable = new PVariable(variableName_chr, quantifier, id,
+				       yylloc.first_line, yylloc.first_column);
+  variableMapping[variableName] = newVariable;
+  
+  return newVariable;
+}
+
+PFreeVariable* new_free_variable(char* variableName_chr, unsigned int id) {
+  string variableName(variableName_chr);
+  
+  if (variable_exists(variableName)) {
+    string error = "Variable '" + variableName + "' already exists.";
+    yyerror(error.c_str());
+    return NULL;
+  }
+
+  PFreeVariable* newVariable = new PFreeVariable(variableName_chr, id,
+					       yylloc.first_line, yylloc.first_column);
+  freeVariableMapping[variableName] = newVariable;
+  
+  return newVariable;
+}
+
+PSet* new_set(char* setName_chr, QUANTIFIER quantifier, unsigned int id) {
+  string setName(setName_chr);
+  
+  if (set_exists(setName)) {
+    string error = "PSet '" + setName + "' already exists.";
+    yyerror(error.c_str());
+    return NULL;
+  }
+
+  set<string>* currentLevel = levelSetMapping[level];
+  currentLevel->insert(setName);
+  PSet* newSet = new PSet(setName_chr, quantifier, id,
+			yylloc.first_line, yylloc.first_column);
+  setMapping[setName] = newSet;
+  
+  return newSet;
+}
+
+PFreeSet* new_free_set(char* setName_chr, unsigned int id) {
+  string setName(setName_chr);
+  
+  if (set_exists(setName)) {
+    string error = "Set '" + setName + "' already exists.";
+    yyerror(error.c_str());
+    return NULL;
+  }
+
+  PFreeSet* newSet = new PFreeSet(setName_chr, id,
+				yylloc.first_line, yylloc.first_column);
+  freeSetMapping[setName] = newSet;
+  
+  return newSet;
+}
+
+PVariable* get_variable(char* variableName_chr) {
+  string variableName(variableName_chr);
+
+  if (variableMapping.count(variableName) == 0) {
+    if (freeVariableMapping.count(variableName) == 0) {
+      string error = "Variable '" + variableName + "' was not declared.";
+      yyerror(error.c_str());
+      return NULL;
+    }
+    // We are looking for a free variable.
+    usedFreeVariables.insert(variableName);
+    return new PVariable((*(freeVariableMapping.find(variableName))).second);
+  }
+  // We are looking for a non-free variable.
+  usedVariables.insert(variableName);
+  return new PVariable((*(variableMapping.find(variableName))).second);
+}
+
+PSet* get_set(char* setName_chr) {
+  string setName(setName_chr);
+
+  if (setMapping.count(setName) == 0) {
+    if (freeSetMapping.count(setName) == 0) {
+      string error = "Set '" + setName + "' was not declared.";
+      yyerror(error.c_str());
+      return NULL;
+    }
+    // We are looking for a free variable.
+    usedFreeSets.insert(setName);
+    return new PSet((*(freeSetMapping.find(setName))).second);
+  }
+  // We are looking for a non-free variable.
+  usedSets.insert(setName);
+  return new PSet((*(setMapping.find(setName))).second);
+}
+
+bool variable_exists (string variableName) {
+  return variableMapping.count(variableName) > 0 
+    || freeVariableMapping.count(variableName) > 0;
+}
+
+bool set_exists (string setName) {
+  return setMapping.count(setName) > 0 
+    || freeSetMapping.count(setName) > 0;
+}
+
+void add_level() {
+  level++;
+  levelVariableMapping[level] = new set<string>();
+  levelSetMapping[level] = new set<string>();
+}
+
+void erase_current_level(set<int>& unusedVariables,set<int>& unusedSets) {
+
+  // Erase the set that where instantiated in case a Quantor was found.
+  // No quantor can have been found, else we would be one level deeper.
+  set<string>* unusedVariableLevel = levelVariableMapping[level];
+  levelVariableMapping.erase(level);
+  delete unusedVariableLevel;
+
+  set<string>* unusedSetLevel = levelSetMapping[level];
+  levelSetMapping.erase(level);
+  delete unusedSetLevel;
+
+  level--;
+  
+  // Delete Variables.
+  set<string>* currentLevelVariables = levelVariableMapping[level];
+  set<string>::iterator i = currentLevelVariables->begin();
+  set<string>::iterator end = currentLevelVariables->end();
+  for (; i != end; i++) {
+    string s = (*i);
+    PVariable* current = (*(variableMapping.find(s))).second;
+    if (usedVariables.count(s) == 0) {
+      cerr << "WARNING: Unused variable '" << s << "'";
+      cerr << " at position " << current->line << ":" << current->column;
+      cerr << endl;
+      unusedVariables.insert(current->id);
+    }
+    delete current;
+
+    variableMapping.erase(s);
+  }
+  levelVariableMapping.erase(level);
+  delete currentLevelVariables;
+
+  levelVariableMapping[level] = new set<string>();
+
+  
+  //Delete Sets.
+  set<string>* currentLevelSets = levelSetMapping[level];
+  i = currentLevelSets->begin();
+  end = currentLevelSets->end();
+  for (; i != end; i++) {
+    string s = (*i);
+    PSet* current = (*(setMapping.find(s))).second;
+    if (usedSets.count(s) == 0) {
+      cerr << "WARNING: Unused set '" << s << "'";
+      cerr << " at position " << current->line << ":" << current->column;
+      cerr << endl;
+    }
+    delete current;
+
+    setMapping.erase(s);
+  }
+  levelSetMapping.erase(level);
+  delete currentLevelSets;
+
+  levelSetMapping[level] = new set<string>();
+}
+
+/*
+ * Erases all the variables that where declared but were not used.
+ */
+PFormula* erase_irrelevants(PFormula* q, set<int>& unusedVariables, set<int>& unusedSets) {
+  PFormula* res = NULL;
+
+  // Find the first one that is not irrelevant or a negation.
+  while (q != NULL
+	 && is_quant(q)
+	 && is_irrelevant((PQuant*)q, unusedVariables, unusedSets)) {
+    PFormula* next = ((PQuant*)q)->formula;
+    erase_quant((PQuant*)q);
+    q = next;
+  }
+  res = q;
+  
+  // Erase all the irrelevant.
+  while (q != NULL) {
+    PFormula* next = NULL;
+    next = ((PFormulaOperation*)q)->formula;
+
+    while(next != NULL) {
+      if (is_quant(next)) {
+	PQuant* copy = (PQuant*) next;
+	if (is_irrelevant((PQuant*)copy, unusedVariables, unusedSets)) {
+	  next = ((PQuant*)next)->formula;
+	  erase_quant((PQuant*)copy);
+	} else {
+	  break;
+	}
+      } else {
+	assert (next->type == NEG_OP);
+	break;
+      }
+    }
+
+    ((PFormulaOperation*)q)->formula = next;
+
+    q = next;
+  }
+
+  return res;
+}
+
+bool is_irrelevant(PQuant* q, set<int>& unusedVariables, set<int>& unusedSets) {
+  assert (q != NULL);
+  TYPE type = q->type;  
+  switch (type) {
+  case ALL_VARIABLE_OP:
+  case EX_VARIABLE_OP:
+    return unusedVariables.count(((PVariableQuant*) q)->variable->variable->id) != 0;
+  case ALL_SET_OP:
+  case EX_SET_OP:
+    return unusedSets.count(((PSetQuant*) q)->set->set->id) != 0;
+  case VARIABLE_IN_SET_OP:
+  case VARIABLE_NOT_IN_SET_OP:
+  case EQ_VAR_OP:
+  case NEQ_VAR_OP:
+  case ADJACENT_OP:
+  case AND_OP:
+  case OR_OP:
+  case IMPLIES_OP:
+  case EQUIV_OP:
+  case NEG_OP:
+  case VARIABLE_POINTER_OP:
+  case SET_POINTER_OP:
+  case FORMULA_POINTER_OP:
+    cerr << "Internal Error: 'is_irrelevant(...)' function called on something which is not a quantor." << endl;
+    assert (false);
+    throw 1;
+  default:
+    cerr << "Internal Error: 'is_irrelevant(...)' function called on an unknown type." << endl;
+    assert (false);
+    throw 1;
+  }
+
+}
+
+void erase_quant(PQuant* q) {
+  
+  TYPE type = q->type;
+  switch (type) {
+  case ALL_VARIABLE_OP:
+  case EX_VARIABLE_OP: 
+    {
+      PVariableQuant* casted = ((PVariableQuant*) q);
+      delete casted->variable->variable;
+      delete casted->variable;
+      delete casted;
+      break;
+    }
+  case ALL_SET_OP:
+  case EX_SET_OP:
+    {
+      PSetQuant* casted = ((PSetQuant*) q);
+      delete casted->set->set;
+      delete casted->set;
+      delete casted;
+      break;
+    }
+  case VARIABLE_IN_SET_OP:
+  case VARIABLE_NOT_IN_SET_OP:
+  case EQ_VAR_OP:
+  case NEQ_VAR_OP:
+  case ADJACENT_OP:
+  case AND_OP:
+  case OR_OP:
+  case IMPLIES_OP:
+  case EQUIV_OP:
+  case NEG_OP:
+  case VARIABLE_POINTER_OP:
+  case SET_POINTER_OP:
+  case FORMULA_POINTER_OP:
+    cerr << "Internal Error: 'erase_quant(...)' function called on something which is not a quantor." << endl;
+    assert (false);
+    throw 1;
+  default:
+    cerr << "Internal Error: 'erase_quant(...)' function called on an unknown type." << endl;
+    assert (false);
+    throw 1;
+  }
+}
+
+bool is_quant(PFormula* formula) {
+  if (formula == NULL) {
+    return false;
+  }
+  
+  TYPE type = formula->type;
+  switch (type) {
+  case ALL_VARIABLE_OP:
+  case EX_VARIABLE_OP:
+  case ALL_SET_OP:
+  case EX_SET_OP:
+    return true;
+  case VARIABLE_IN_SET_OP:
+  case VARIABLE_NOT_IN_SET_OP:
+  case EQ_VAR_OP:
+  case NEQ_VAR_OP:
+  case ADJACENT_OP:
+  case AND_OP:
+  case OR_OP:
+  case IMPLIES_OP:
+  case EQUIV_OP:
+  case NEG_OP:
+  case VARIABLE_POINTER_OP:
+  case SET_POINTER_OP:
+  case FORMULA_POINTER_OP:
+    return false;
+  default:
+    cerr << "Internal Error: 'erase_quant(...)' function called on an unknown type." << endl;
+    assert (false);
+    throw 1;
+  }
+}
+
+void initialize_parser() {
+  levelVariableMapping[0] = new set<string>();
+  levelSetMapping[0] = new set<string>();
+}
+
+void collect_free_variables_and_sets() {
+  map<string, struct PFreeVariable*>::iterator iFV = freeVariableMapping.begin();
+  map<string, struct PFreeVariable*>::iterator endFV = freeVariableMapping.end();
+  for(; iFV != endFV; ++ iFV) {
+    if (usedFreeVariables.count((*iFV).first) == 0) {
+      cerr << "WARNING: Unused free variable: " << (*iFV).first << endl;
+    }
+    //variableGarbageCollector.insert((*iFV).second);
+    //delete (*iFV).second;
+  }
+
+  map<string, struct PFreeSet*>::iterator iSV = freeSetMapping.begin();
+  map<string, struct PFreeSet*>::iterator endSV = freeSetMapping.end();
+  for(; iSV != endSV; ++ iSV) {
+    if (usedFreeSets.count((*iSV).first) == 0) {
+      cerr << "WARNING: Unused free set: " << (*iSV).first << endl;
+    }
+    //setGarbageCollector.insert((*iSV).second);
+    //delete (*iSV).second;
+  }
+}
+
+void clear_parser() {
+  map<string, struct PVariable*>::iterator itVM =  variableMapping.begin();
+  map<string, struct PSet*>::iterator itSM =  setMapping.begin();
+  map<string, struct PFreeVariable*>::iterator itFVM =  freeVariableMapping.begin();
+  map<string, struct PFreeSet*>::iterator itFSM =  freeSetMapping.begin();
+  map<string, struct PVariable*>::iterator endVM =  variableMapping.end();
+  map<string, struct PSet*>::iterator endSM =  setMapping.end();
+  map<string, struct PFreeVariable*>::iterator endFVM =  freeVariableMapping.end();
+  map<string, struct PFreeSet*>::iterator endFSM =  freeSetMapping.end();
+  for(;itVM != endVM; itVM++) {
+    delete (*itVM).second;
+  }
+  for(;itSM != endSM; itSM++) {
+    delete (*itSM).second;
+  }
+  for(;itFVM != endFVM; itFVM++) {
+    delete (*itFVM).second;
+  }
+  for(;itFSM != endFSM; itFSM++) {
+    delete (*itFSM).second;
+  }
+
+  reset_mappings();
+}
+
+void finalize_parser() {
+#ifdef DEBUG
+  cout << "Removing all memory allocated by the parser." << endl;
+#endif
+
+  clear_parser();
+  
+  variableCounter = 0;
+  setCounter = 0;
+
+  formulas.clear();
+
+  // Finalize the lexer.
+  yylex_destroy();
+#ifdef DEBUG
+  cout << "Done." << endl;
+#endif
+
+}
+
+void reset_mappings() {
+  map<int, set<string>*>::iterator iVL = levelVariableMapping.begin();
+  map<int, set<string>*>::iterator endVL = levelVariableMapping.end();
+  for(; iVL != endVL; iVL++) {
+    delete (*iVL).second;
+  }
+
+  map<int, set<string>*>::iterator iSL = levelSetMapping.begin();
+  map<int, set<string>*>::iterator endSL = levelSetMapping.end();
+  for(; iSL != endSL; iSL++) {
+    delete (*iSL).second;
+  }
+
+  variableMapping.clear();
+  setMapping.clear();
+  freeVariableMapping.clear();
+  freeSetMapping.clear();
+  levelVariableMapping.clear();
+  levelSetMapping.clear();
+
+  usedVariables.clear();
+  usedSets.clear();
+  usedFreeVariables.clear();
+  usedFreeSets.clear();
+}
+
+void find_used_formulas(PFormula* formula, set<struct PFormula*> &usedFormulas) {
+  TYPE type = formula->type;
+  switch(type) {
+  case VARIABLE_IN_SET_OP:
+  case VARIABLE_NOT_IN_SET_OP:
+  case EQ_VAR_OP:
+  case NEQ_VAR_OP:
+  case ADJACENT_OP:
+  case VARIABLE_POINTER_OP:
+  case SET_POINTER_OP:
+    break;
+  case AND_OP:
+  case OR_OP:
+  case IMPLIES_OP:
+  case EQUIV_OP:
+    {
+      PFormulaFormulaOperation* casted = (PFormulaFormulaOperation*) formula;
+      find_used_formulas(casted->left, usedFormulas);
+      find_used_formulas(casted->right, usedFormulas);
+      break;
+    }
+  case NEG_OP:
+  case ALL_VARIABLE_OP:
+  case EX_VARIABLE_OP:
+  case ALL_SET_OP:
+  case EX_SET_OP:
+    {
+      PFormulaOperation* casted = (PFormulaOperation*) formula;
+      find_used_formulas(casted->formula, usedFormulas);
+      break;
+    }
+  case FORMULA_POINTER_OP:
+    {
+      PFormulaPointer* casted = (PFormulaPointer*) formula;
+      usedFormulas.insert(casted->formula);
+      find_used_formulas(casted->formula, usedFormulas);
+      break;
+    }
+  default: 
+    {
+      cerr << "ERROR: Error finding the used formulas in the parsing result. " << endl;
+    }
+  }
+}
+
+void delete_tree(PFormula* f) {
+
+  // This is needed for when the parser fails, but we still
+  // want to delete the tree.
+  if (f == NULL) {
+    assert(yyparseReturnValue != 0);
+    return;
+  }
+  
+  TYPE type = f->type;
+  switch (type) {
+  case VARIABLE_IN_SET_OP:
+  case VARIABLE_NOT_IN_SET_OP:
+  case EQ_VAR_OP:
+  case NEQ_VAR_OP:
+  case ADJACENT_OP:
+  case VARIABLE_POINTER_OP:
+  case SET_POINTER_OP:
+    break;
+  case AND_OP:
+  case OR_OP:
+  case IMPLIES_OP:
+  case EQUIV_OP:
+    {
+      PFormulaFormulaOperation* casted = (PFormulaFormulaOperation*) f;
+      delete_tree(casted->left);
+      delete_tree(casted->right);
+      break;
+    }
+  case NEG_OP:
+  case ALL_VARIABLE_OP:
+  case EX_VARIABLE_OP:
+  case ALL_SET_OP:
+  case EX_SET_OP:
+    {
+      PFormulaOperation* casted = (PFormulaOperation*) f;
+      delete_tree(casted->formula);
+      break;
+    }
+  case FORMULA_POINTER_OP:
+    {
+      break;
+    }
+  default: 
+    {
+      cerr << "ERROR: Error deleting the internal structure tree of the parser. ";
+      cerr << "This may cause the parser to leak." << endl;
+      break;
+    }
+  }
+
+  delete_tree_element(f);
+}
+
+void delete_tree_element(PFormula* f) {
+
+    //std::cout << "delete tree element for formula of type: " << f->type << std::endl;
+
+  TYPE type = f->type;
+  switch (type) {
+  case VARIABLE_IN_SET_OP:
+  case VARIABLE_NOT_IN_SET_OP:
+    {
+      PVariableSetOperation* casted = (PVariableSetOperation*) f;
+      delete casted->variable->variable;
+      delete casted->set->set;
+      delete casted;
+      break;
+    }
+  case EQ_VAR_OP:
+  case NEQ_VAR_OP:
+  case ADJACENT_OP:
+    {
+      PVariableVariableOperation* casted = (PVariableVariableOperation*) f;
+      delete casted->left->variable;
+      delete casted->right->variable;
+      delete casted;
+      break;
+    }
+  case VARIABLE_POINTER_OP:
+    {
+      PVariablePointer* casted = (PVariablePointer*) f;
+      delete casted->variable;
+      delete casted;
+      break;
+    }
+  case SET_POINTER_OP:
+    {
+      PSetPointer* casted = (PSetPointer*) f;
+      delete casted->set;
+      delete casted;
+      break;
+    }
+  case AND_OP:
+  case OR_OP:
+  case IMPLIES_OP:
+  case EQUIV_OP:
+    {
+      PFormulaFormulaOperation* casted = (PFormulaFormulaOperation*) f;
+      delete casted;
+      break;
+    }
+  case NEG_OP:
+    {
+      PFormulaOperation* casted = (PFormulaOperation*) f;
+      delete casted;
+      break;
+    }
+  case ALL_VARIABLE_OP:
+  case EX_VARIABLE_OP:
+    {
+      PVariableQuant* casted = (PVariableQuant*) f;
+      delete casted->variable->variable;
+      delete casted->variable;
+      delete casted;
+      break;
+    }
+  case ALL_SET_OP:
+  case EX_SET_OP:
+    {
+      PSetQuant* casted = (PSetQuant*) f;
+      delete casted->set->set;
+      delete casted->set;
+      delete casted;
+      break;
+    }
+  case FORMULA_POINTER_OP:
+    {
+      PFormulaPointer* casted = (PFormulaPointer*) f;
+      list<struct PPointer*>::iterator itVar = casted->arguments.begin();
+      list<struct PPointer*>::iterator endVar = casted->arguments.end();
+      for (; itVar != endVar; itVar++) {
+	if ((*itVar)->pointer_type == PPointer::VAR_TYPE) {
+	  delete ((PVariablePointer*)(*itVar))->variable;
+	  delete (PVariablePointer*)(*itVar);
+	} else {
+	  assert ((*itVar)->pointer_type == PPointer::SET_TYPE);
+	  delete ((PSetPointer*)(*itVar))->set;
+	  delete (PSetPointer*)(*itVar);
+	}
+      }
+      itVar = casted->passed_arguments.begin();
+      endVar = casted->passed_arguments.end();
+      for (; itVar != endVar; itVar++) {
+	if ((*itVar)->pointer_type == PPointer::VAR_TYPE) {
+	  delete ((PVariablePointer*)(*itVar))->variable;
+	  delete (PVariablePointer*)(*itVar);
+	} else {
+	  assert ((*itVar)->pointer_type == PPointer::SET_TYPE);
+	  delete ((PSetPointer*)(*itVar))->set;
+	  delete (PSetPointer*)(*itVar);
+	}
+      }
+      delete casted;
+      break;
+    }
+  default: 
+    {
+      cerr << "ERROR: Error deleting the internal structure tree of the parser. (" << type_string(type) << ")" << endl; 
+      cerr << "This may cause the parser to leak." << endl;
+      break;
+    }
+  }
+}
+
+void print_raw_tree (PFormula* f) {
+  assert(f != NULL);
+  
+  TYPE type = f->type;
+  switch (type) {
+  case VARIABLE_IN_SET_OP: 
+    {
+      PVariableSetOperation* casted = (PVariableSetOperation*) f;
+      cout << "(" << print_variable(casted->variable) << " in " << print_variable(casted->set) << ")";
+      break;
+    }
+  case VARIABLE_NOT_IN_SET_OP:
+    {
+      PVariableSetOperation* casted = (PVariableSetOperation*) f;
+      cout << "(" << print_variable(casted->variable) << " notin " << print_variable(casted->set) << ")";
+      break;
+    }
+  case EQ_VAR_OP:
+    {
+      PVariableVariableOperation* casted = (PVariableVariableOperation*) f;
+      cout << "(" << print_variable(casted->left) << " = " << print_variable(casted->right) << ")";
+      break;
+    }
+  case NEQ_VAR_OP:
+    {
+      PVariableVariableOperation* casted = (PVariableVariableOperation*) f;
+      cout << "(" << print_variable(casted->left) << " != " << print_variable(casted->right) << ")";
+      break;
+    }
+  case ADJACENT_OP:
+    {
+      PVariableVariableOperation* casted = (PVariableVariableOperation*) f;
+      cout << "(" << print_variable(casted->left) << " adj " << print_variable(casted->right) << ")";
+      break;
+    }
+  case AND_OP:
+    {
+      PFormulaFormulaOperation* casted = (PFormulaFormulaOperation*) f;
+      cout << "((";
+      print_raw_tree(casted->left);
+      cout << ")"; 
+      cout << " AND ";
+      cout << "(";
+      print_raw_tree(casted->right);
+      cout << "))";
+      break;
+    }
+  case OR_OP:
+    {
+      PFormulaFormulaOperation* casted = (PFormulaFormulaOperation*) f;
+      cout << "(";
+      print_raw_tree(casted->left);
+      cout << " OR ";
+      print_raw_tree(casted->right);
+      cout << ")";
+      break;
+    }
+  case IMPLIES_OP:
+    {
+      PFormulaFormulaOperation* casted = (PFormulaFormulaOperation*) f;
+      cout << "(";
+      print_raw_tree(casted->left);
+      cout << " => ";
+      print_raw_tree(casted->right);
+      cout << ")";
+      break;
+    }
+  case EQUIV_OP:
+    {
+      PFormulaFormulaOperation* casted = (PFormulaFormulaOperation*) f;
+      cout << "(";
+      print_raw_tree(casted->left);
+      cout << " <=> ";
+      print_raw_tree(casted->right);
+      cout << ")";
+      break;
+    }
+  case NEG_OP:
+    {
+      PFormulaOperation* casted = (PFormulaOperation*) f;
+      cout << "!(";
+      print_raw_tree(casted->formula);
+      cout << ")";
+      break;
+    }
+  case VARIABLE_POINTER_OP:
+    {
+      PVariablePointer* casted = (PVariablePointer*) f;
+      cout << "@var(";
+      cout << casted->variable->name << "[" << casted->variable->id << "]" << ")";
+
+      break;
+    }
+  case SET_POINTER_OP:
+    {
+      PSetPointer* casted = (PSetPointer*) f;
+      cout << casted->set->name << "[" << casted->set->id << "]" << "@" << casted << ":" << casted->set;
+      break;
+    }
+  case ALL_VARIABLE_OP:
+    {
+      PVariableQuant* casted = (PVariableQuant*) f;
+      cout << "AllVar " << print_variable(casted->variable) /*<< "{" << casted->variable->variable << "}"*/ << "("; 
+      print_raw_tree(casted->formula);
+      cout << ")";
+      break;
+    }
+  case EX_VARIABLE_OP:
+    {
+      PVariableQuant* casted = (PVariableQuant*) f;
+      cout << "ExVar " << print_variable(casted->variable) /*<< "{" << casted->variable->variable << "}"*/ << "("; 
+      print_raw_tree(casted->formula);
+      cout << ")";
+      break;
+    }
+  case ALL_SET_OP:
+    {
+      PSetQuant* casted = (PSetQuant*) f;
+      cout << "AllSet " << print_variable(casted->set) /*<< "{" << casted->set->set << "}"*/ << "("; 
+      print_raw_tree(casted->formula);
+      cout << ")";
+      break;
+    }
+  case EX_SET_OP:
+    {
+      PSetQuant* casted = (PSetQuant*) f;
+      cout << "ExSet " << print_variable(casted->set) /*<< "{" << casted->set->set << "}"*/ << "("; 
+      print_raw_tree(casted->formula);
+      cout << ")";
+      break;
+    }
+  case FORMULA_POINTER_OP:
+    {
+      PFormulaPointer* casted = (PFormulaPointer*) f;
+      cout << casted->name << "(";
+      assert(casted->passed_arguments.size() <= casted->arguments.size());
+      list<struct PPointer*>::iterator it = casted->passed_arguments.begin();
+      list<struct PPointer*>::iterator end = casted->passed_arguments.end();
+      list<struct PPointer*>::iterator it1 = casted->arguments.begin();
+      list<struct PPointer*>::iterator end1 = casted->arguments.end();
+      while (it1 != end1) {
+	if ((*it1)->pointer_type == PPointer::VAR_TYPE) {
+	  cout << print_variable((PVariablePointer*)(*it1));
+	  if (it != end)
+	    cout << "=" << print_variable((PVariablePointer*)(*it));
+	} else {
+	  cout << print_variable((PSetPointer*)(*it1));
+	  if (it != end)
+	    cout << "=" << print_variable((PSetPointer*)(*it));
+	}
+	if (it != end)
+	  it++;
+	it1++;
+	if (it1 != end1)
+	  cout << ", ";
+      }
+      cout << "){";
+      print_raw_tree(casted->formula);
+      cout << "}";
+      break;
+    }
+  default:
+    cout << "TYPE Unknown: " << type_string(type) << endl;
+    return;
+  }
+}
+
+string print_variable(PFormula* f) {
+  std::stringstream out;
+  
+  switch(f->type) {
+  case VARIABLE_POINTER_OP:
+    {
+      PVariablePointer* casted = (PVariablePointer*) f;
+      out << casted->variable->name << "[" << casted->variable->id 
+        //<< "," << casted << "," << casted->variable
+        << "]";
+      break;
+    }
+  case SET_POINTER_OP:
+    {
+      PSetPointer* casted = (PSetPointer*) f;
+      out << casted->set->name << "[" << casted->set->id
+        //<< "," << casted << "," << casted->set
+        << "]";
+      break;
+    }
+  case VARIABLE_IN_SET_OP:
+  case VARIABLE_NOT_IN_SET_OP:
+  case EQ_VAR_OP:
+  case NEQ_VAR_OP:
+  case ADJACENT_OP:
+  case AND_OP:
+  case OR_OP:
+  case IMPLIES_OP:
+  case EQUIV_OP:
+  case NEG_OP:
+  case ALL_VARIABLE_OP:
+  case EX_VARIABLE_OP:
+  case ALL_SET_OP:
+  case EX_SET_OP:
+  case FORMULA_POINTER_OP:
+    return string("[Not a variable]");
+  }
+
+  return out.str();
+}
+
+const char* type_string(TYPE type) {  
+  switch (type) {
+  case VARIABLE_IN_SET_OP: return "VARIABLE_IN_SET_OP";
+  case VARIABLE_NOT_IN_SET_OP: return "VARIABLE_NOT_IN_SET_OP";
+  case EQ_VAR_OP: return "EQ_VAR_OP";
+  case NEQ_VAR_OP: return "NEQ_VAR_OP";
+  case ADJACENT_OP: return "ADJACENT_OP";
+  case AND_OP: return "AND_OP";
+  case OR_OP: return "OR_OP";
+  case IMPLIES_OP: return "IMPLIES_OP";
+  case EQUIV_OP: return "EQUIV_OP";
+  case NEG_OP: return "NEG_OP";
+  case VARIABLE_POINTER_OP: return "VARIABLE_POINTER_OP";
+  case SET_POINTER_OP: return "SET_POINTER_OP";
+  case ALL_VARIABLE_OP: return "ALL_VARIABLE_OP";
+  case EX_VARIABLE_OP: return "EX_VARIABLE_OP";
+  case ALL_SET_OP: return "ALL_SET_OP";
+  case EX_SET_OP: return "EX_SET_OP";
+  case FORMULA_POINTER_OP: return "FORMULA_POINTER_OP";
+  default: return "No name for this type.";
+  }
+}

@@ -1,0 +1,3 @@
+-- Tests whether U is a clique
+
+clique(U) := All x All y (x = y or x notin U or y notin U or adj(x,y))

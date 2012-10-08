@@ -1,0 +1,13 @@
+Name(e) := Ex Fer All a Ex b (a in Fer and All t Ex c (c = b & a = b and a = t) or All d Ex fel(adj(d,e) or fel != e)) 
+Name2(F) := All a Ex b ( a in F and Name(a) )
+ds(U) := All x (x in U | Ex y (adj(x,y) & y in U))
+vc(V) := All x All y (~adj(x, y) or x in V or y in V)
+f(x,y,j) := 	~All u ~All t All v ~All z~(x = v and y = u and z = z)
+f2(x,X,H) := x in X and ~All y All Y ~All B~((x = y and y in X or x in Y) or All z All a(~(~(z = z) <=> (z in Y)))) and x in H
+--Test(x,X) := x in X and x = x or All Y ~Ex a()--Testing comment capabilities
+--Testing comment capabilities
+simple(x,Y) := x in Y
+f3(x, Y) := (x = x) and All z(z = x or z in Y)
+h(Z) := Ex x Ex y( simple(x, Z) and f3(y,Z) and simple(y,Z) )
+g(y) := All Y(y in Y and All Z(h(Z) and h(Y)))
+--Testing comment capabilities.

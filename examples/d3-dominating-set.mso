@@ -1,0 +1,9 @@
+-- Tests whether U is a distance-at-most-3 dominating set.
+
+d3ds(U) := All x (x in U |
+		  Ex y ( (adj(x,y) & y in U) |
+		         Ex z ( (adj(x, y) & adj(y,z) & z in U) |
+		         	Ex zz ( (adj(x, y) & adj(y,z) & adj(z, zz) & zz in U))
+			 	)
+		       )
+		  )

@@ -1,0 +1,13 @@
+Fred Grossmann
+Fernando Sanchez Villamil
+
+Includes the following files taken from the boost library:
+        boost's dimacs reader in src/structures/ggraph_factory_dimacs.hpp
+
+Google sparse hash
+
+
+
+our graphml reader is based on boost's graphml reader.  Please add credit here.
+
+

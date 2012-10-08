@@ -1,0 +1,3 @@
+-- Tests whether U is an independent set.
+
+is(U) := All x All y (~adj(x, y) or x notin U or y notin U)

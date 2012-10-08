@@ -1,0 +1,17 @@
+-- More efficient formula for three-coloring; tests whether
+-- (R, G, V\setminus (R\cup G)) is a proper three-coloring of the graph
+
+ThreeCol(R, B) := 
+		All x (		
+				(x notin R or x notin B)
+			and
+				All y (
+					~adj(x,y) or (
+						(x notin R or y notin R) and
+						(x notin B or y notin B) and 
+						((x in R) or (x in B)
+                                                   or
+						 (y in R) or (y in B))
+					)
+				)
+		)

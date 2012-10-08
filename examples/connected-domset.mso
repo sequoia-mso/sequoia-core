@@ -1,0 +1,15 @@
+-- Tests whether U is a connected dominating set.
+
+ds(U) :=
+	(All R (
+		~(
+			(All x (x notin R or x in U))			-- If R is a subset of U,
+			and (Ex x (x in R))				-- R is not empty, and
+			and (Ex x (x notin R and x in U))		-- R != U
+		) or 							-- then
+		Ex x Ex y (adj(x,y) and x in R and y notin R and y in U)))	-- there is an edge from R to U\R
+
+		&
+
+	(All x (x in U | Ex y (adj(x,y) & y in U)))		-- U dominates the graph
+

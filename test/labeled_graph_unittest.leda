@@ -1,0 +1,11 @@
+LEDA.GRAPH
+string
+string
+-1
+5
+|{A first node label}|
+|{Test me}|
+|{Test me more}|
+|{A second node label}|
+|{Red, Green, Blue             Foo}|
+0

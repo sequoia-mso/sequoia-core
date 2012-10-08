@@ -1,0 +1,7 @@
+-- Tests whether U is a distance-at-most-2 dominating set
+
+ddds(U) := All x (x in U |
+		  Ex y ( (adj(x,y) & y in U) |
+		         Ex z ( (adj(x, y) & adj(y,z) & z in U))
+		       )
+		  )

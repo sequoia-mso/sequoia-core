@@ -1,0 +1,3 @@
+-- tests whether U is a vertex cover
+
+vc(U) := All x All y (~adj(x, y) or x in U or y in U)

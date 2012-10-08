@@ -1,0 +1,17 @@
+-- tests whether F is a Hamiltonian Cycle.  Needs the incidence graph model.
+
+path2(a,x,b) := (adj(a, x) & adj(x, b))
+
+ham(F,Vertex,Edge) := All x ( (x notin F or x in Edge) &
+		      (x notin Vertex or (Ex a Ex b All c (a in F and b in F and ~(a=b) and path2(a,x,b)
+		      					and (~(path2(c,x,b) or path2(a,x,c)) or c notin F or a=c or b=c)
+						     )
+				  )
+			)
+		)
+	& 
+	All R ((Ex x (x in R & x notin F))			-- either R is not a subset of F, or
+		or ~Ex x (x in R)				-- R is not empty, or
+		or ~Ex x (x notin R and x in F) or		-- R != F
+		Ex x Ex y Ex z (adj(x,z) and x in R and adj(z,y) and z in Vertex and y notin R and y in F))
+

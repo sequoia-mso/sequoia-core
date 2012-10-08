@@ -1,0 +1,3 @@
+-- Tests whether the graph is connected.
+
+connected := All R (~Ex x (x in R) or ~Ex x (x notin R) or Ex x Ex y (adj(x,y) and x in R and y notin R))

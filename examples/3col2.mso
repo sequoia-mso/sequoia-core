@@ -1,0 +1,16 @@
+-- More efficient test whether the graph is three-colorable.
+
+ThreeCol := Ex R Ex B
+		All x (		
+				(x notin R or x notin B)
+			and
+				All y (
+					~adj(x,y) or (
+						(x notin R or y notin R) and
+						(x notin B or y notin B) and 
+						((x in R) or (x in B)
+                                                   or
+						 (y in R) or (y in B))
+					)
+				)
+		)

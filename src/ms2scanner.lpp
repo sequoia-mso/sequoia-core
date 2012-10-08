@@ -1,0 +1,79 @@
+/*
+ * This file is part of the Sequoia MSO Solver.
+ * 
+ * Copyright 2012 Fernando Sanchez Villamil, Theoretical Computer Science,
+ *                                           RWTH Aachen University
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+/**
+ * @author Fernando Sanchez Villamil
+ */
+%{
+#include "ms2grammar.hpp"
+#include <iostream>
+#include <string.h>
+
+#define YY_USER_INIT {yylloc.first_column = yylloc.last_column = 0; yylloc.first_line = 1;}
+
+#define YY_USER_ACTION {yylloc.first_column = yylloc.last_column; yylloc.last_column += yyleng;}
+
+%}
+%option noyywrap
+%%
+"("		{return OPEN_PAREN;						}
+")"		{return CLOSE_PAREN;						}
+","		{return COMMA;							}
+":="		{return DEFINE;							}
+";"		{return SEMI_COLON;						}
+0|false		{return ZERO;							}
+1|true		{return ONE;							}
+and|"&"		{return AND_TOKEN;						}
+or|"|"		{return OR_TOKEN;						}
+"~"|"!"		{return NEG;							}
+"<=>"		{return EQUIV;							}
+"=>"		{return IMPLIES;						}
+"="		{return EQ;							}
+"~="|"!="	{return NEQ;							}
+All		{return UNIVERSAL_QUANTIFIER;					}
+Ex		{return EXISTENTIAL_QUANTIFIER;					}
+adj		{return ADJACENT;						}
+\*[A-z]+	{// We begin at 'yytext + 1' to jump over the '*' symbol.
+		 yylval.value = (char*)strdup(yytext + 1);
+		 return RELATION;						}
+in		{return IN;							}
+notin		{return NOT_IN;							}
+"<"		{return RSUB;							}
+"<="		{return SUB;							}
+[A-Z][A-z0-9]*	{yylval.value = (char*)strdup(yytext);
+		 return SET;							}
+[a-z][A-z0-9]*	{yylval.value = (char*)strdup(yytext);
+                 return VARIABLE;						}
+\n|\r\n		{yylloc.first_column = yylloc.last_column = 0; 
+		 yylloc.first_line++;						}
+[\t]+		{//std::cerr << "WARNING: A tab charachter was encountered in the ";
+		 //std::cerr << "MSO formula. ";
+		 //std::cerr << "This may cause the program to report errors ";
+		 //std::cerr << "at the wrong column on line " << yylloc.first_line;
+		 //std::cerr << "." << std::endl;
+		 /*Jump ovet tabs.*/}
+--.*		 {/*Jump over comment at the last line.*/			}
+--.*\n		 {/*Jump over comments*/
+		  yylloc.first_column = yylloc.last_column = 0; 
+		  yylloc.first_line++;						}
+[ \r]+		 /*Jump over white space.*/
+.           	 {std::cerr << "Unrecognized character: " << yytext << std::endl;
+		  return ERROR;							}
+
+
+%%
