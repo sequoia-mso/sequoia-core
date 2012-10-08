@@ -58,7 +58,6 @@ AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([
 Makefile
 src/Makefile
-tools/Makefile
 test/Makefile
 ])
 AC_CONFIG_SUBDIRS([contrib/sparsehash-2.0.2])
