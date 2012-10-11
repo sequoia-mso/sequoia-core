@@ -61,56 +61,57 @@ am__DEPENDENCIES_1 =
 cnf2graph_DEPENDENCIES = $(top_builddir)/src/libsequoia.la \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am_compute_tw_bound_OBJECTS = compute_tw_bound.$(OBJEXT)
 compute_tw_bound_OBJECTS = $(am_compute_tw_bound_OBJECTS)
 compute_tw_bound_LDADD = $(LDADD)
 compute_tw_bound_DEPENDENCIES = $(top_builddir)/src/libsequoia.la \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am_connected_components_OBJECTS = connected_components.$(OBJEXT)
 connected_components_OBJECTS = $(am_connected_components_OBJECTS)
 connected_components_LDADD = $(LDADD)
 connected_components_DEPENDENCIES = $(top_builddir)/src/libsequoia.la \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am_file_format_converter_OBJECTS = file_format_converter.$(OBJEXT)
 file_format_converter_OBJECTS = $(am_file_format_converter_OBJECTS)
 file_format_converter_LDADD = $(LDADD)
 file_format_converter_DEPENDENCIES =  \
 	$(top_builddir)/src/libsequoia.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 am_gen_grid_tdc_OBJECTS = gen_grid_tdc.$(OBJEXT)
 gen_grid_tdc_OBJECTS = $(am_gen_grid_tdc_OBJECTS)
 gen_grid_tdc_LDADD = $(LDADD)
 gen_grid_tdc_DEPENDENCIES = $(top_builddir)/src/libsequoia.la \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am_gen_rand_graph_OBJECTS = gen_rand_graph.$(OBJEXT)
 gen_rand_graph_OBJECTS = $(am_gen_rand_graph_OBJECTS)
 gen_rand_graph_LDADD = $(LDADD)
 gen_rand_graph_DEPENDENCIES = $(top_builddir)/src/libsequoia.la \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am_make_incidence_graph_OBJECTS = make_incidence_graph.$(OBJEXT)
 make_incidence_graph_OBJECTS = $(am_make_incidence_graph_OBJECTS)
 make_incidence_graph_LDADD = $(LDADD)
 make_incidence_graph_DEPENDENCIES = $(top_builddir)/src/libsequoia.la \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 am_make_nice_tdc_OBJECTS = make_nice_tdc.$(OBJEXT)
 make_nice_tdc_OBJECTS = $(am_make_nice_tdc_OBJECTS)
 make_nice_tdc_LDADD = $(LDADD)
 make_nice_tdc_DEPENDENCIES = $(top_builddir)/src/libsequoia.la \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/build-aux/depcomp
 am__depfiles_maybe = depfiles
@@ -301,6 +302,7 @@ LDADD = $(top_builddir)/src/libsequoia.la \
 				$(BOOST_SYSTEM_LIBS) \
 				$(BOOST_GRAPH_LIBS) \
 				$(BOOST_TIMER_LIBS) \
+				$(BOOST_CHRONO_LIBS) \
 				$(BOOST_FILESYSTEM_LIBS) \
 				$(BOOST_THREAD_LIBS) 
 
