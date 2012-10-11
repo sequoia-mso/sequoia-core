@@ -1,5 +1,5 @@
 DEPS=				$(top_builddir)/src/libsequoia.la
-AM_CXXFLAGS = 			-fPIC -I../src -I../contrib/sparsehash-2.0.2/src 
+AM_CXXFLAGS = 			-fPIC -I../src -I../contrib/sparsehash-2.0.2/src
 AM_CFLAGS = 			-I../src
 AM_CPPFLAGS = 			$(BOOST_CPPFLAGS)
 AM_CXXFLAGS += 			-Wno-deprecated
@@ -8,6 +8,7 @@ LDADD  = 			$(top_builddir)/src/libsequoia.la \
 				$(BOOST_SYSTEM_LIBS) \
 				$(BOOST_GRAPH_LIBS) \
 				$(BOOST_TIMER_LIBS) \
+				$(BOOST_CHRONO_LIBS) \
 				$(BOOST_FILESYSTEM_LIBS) \
 				$(BOOST_THREAD_LIBS) 
 
