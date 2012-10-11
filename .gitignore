@@ -39,6 +39,10 @@ test/mindegree_heuristic_unittest
 test/moves_unittest
 test/parser_unittest
 test/tdc_unittest
+
+tools/.deps/
+tools/.libs/
+
 nbproject/
 
 contrib/sparsehash-2.0.2/.deps/
