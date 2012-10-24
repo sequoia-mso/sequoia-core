@@ -1,0 +1,14 @@
+-- tests if F is a cycle.  Needs the incidence graph model.
+
+path2(a,x,b) := (adj(a, x) & adj(x, b))
+
+cycle(F,Vertex,Edge) :=
+All x ( x notin F or
+  (Ex xa Ex xb All xc (xa in F and xb in F and ~(xa = xb) and path2(xa, x, xb)
+   and (~(path2(xc,x,xb) or path2(xa,x,xc)) or xc notin F or xa=xc or xb=xc))))
+& 
+All R ((Ex x (x in R & x notin F))	-- either R is not a subset of F, or
+		or ~Ex x (x in R)				-- R is empty, or
+		or ~Ex x (x notin R and x in F) or		-- R == F
+		Ex x Ex y (adj(x,y) and x in R and y notin R and y in F))
+
