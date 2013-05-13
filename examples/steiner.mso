@@ -1,6 +1,6 @@
 -- Tests whether U is a connected set that contains T.
 
-ds(U,T) :=
+steiner(U,T) :=
 (All R (
   ~(
      (All x (x notin R or x in U))	-- If R is a subset of U,

@@ -1,3 +1,3 @@
-Tests whether U is a dominating set.
+-- Tests whether U is a dominating set.
 
 ds(U) := All x (x in U | Ex y (adj(x,y) & y in U))
