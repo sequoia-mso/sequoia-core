@@ -1,0 +1,16 @@
+-- Tests whether U is a connected set that contains T.
+
+ds(U,T) :=
+(All R (
+  ~(
+     (All x (x notin R or x in U))	-- If R is a subset of U,
+      and (Ex x (x in R))	        -- R is not empty, and
+      and (Ex x (x notin R and x in U)) -- R != U
+   ) or 				
+       -- then there is an edge from R to U\R
+   Ex x Ex y (adj(x,y) and x in R and y notin R and y in U))
+)	-- there is an edge from R to U\R
+
+		and
+
+(All x (x in U | x notin T))		-- T subset of U
