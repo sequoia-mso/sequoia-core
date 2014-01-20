@@ -121,7 +121,7 @@ cache_join_store(const Formula *formula,
 		 const CacheJoinValue *result) {
 #if USE_CACHE
     assert(game_left->get()->formula() == game_right->get()->formula());
-    if (formula->height() < CACHE_CUTOFF) return;
+    if (formula == NULL || formula->height() < CACHE_CUTOFF) return;
     internal::cache_join.store(formula, alpha, game_left, game_right, result);
 #else
     return;
@@ -135,7 +135,7 @@ cache_join_lookup(const Formula *formula,
 		  const MCGame_f *game_right) {
 #if USE_CACHE
     assert(game_left->get()->formula() == game_right->get()->formula());
-    if (formula->height() < CACHE_CUTOFF) return NULL;
+    if (formula == NULL || formula->height() < CACHE_CUTOFF) return NULL;
     return internal::cache_join.lookup(formula, alpha, game_left, game_right);
 #else
     return NULL;
