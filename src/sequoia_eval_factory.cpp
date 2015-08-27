@@ -25,6 +25,7 @@
 #include "sequoia_eval_minmaxcardset.h"
 #include "sequoia_eval_bool.h"
 #include "sequoia_eval_witness.h"
+#include "sequoia_eval_counting.h"
 
 #include <fstream>
 #include <string>
@@ -66,6 +67,8 @@ sequoia_eval_make(const std::string &name,
         res = new MaxCardSetEvaluation();
     } else if (name == "Witness") {
         res = new WitnessEvaluation();
+    } else if (name == "Counting") {
+        res = new CountingEvaluation();
     } else {
         throw sequoia_usage_error("Unknown evaluation");
     }
