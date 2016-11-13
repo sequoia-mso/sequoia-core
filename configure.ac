@@ -2,7 +2,7 @@
 AC_INIT([sequoia], [0.9], [langer@cs.rwth-aachen.de])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([build-aux])
-AM_INIT_AUTOMAKE([-Wall foreign])
+AM_INIT_AUTOMAKE([-Wall foreign subdir-objects])
 
 # order is important
 AC_PROG_CXX
@@ -10,7 +10,7 @@ AC_PROG_CC
 AC_LANG([C++])
 AM_PROG_LEX
 AC_PROG_YACC
-#AM_PROG_AR
+AM_PROG_AR
 AC_PROG_LIBTOOL
 
 dnl boost
@@ -61,5 +61,5 @@ src/Makefile
 tools/Makefile
 test/Makefile
 ])
-AC_CONFIG_SUBDIRS([contrib/sparsehash-2.0.2])
+AC_CONFIG_SUBDIRS([contrib/sparsehash-2.0.3])
 AC_OUTPUT

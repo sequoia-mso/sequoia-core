@@ -12,7 +12,7 @@ src/structures/graph_factory_dimacs.hpp                              Boost 1.0
 src/structures/graphml_reader.cpp			             Boost 1.0
 	Copyright (C) 2006  Tiago de Paula Peixoto <tiago@forked.de>
 	Copyright (C) 2004,2009  The Trustees of Indiana University.
-contrib/sparsehash-2.0.2/*                                        BSD (Google)
+contrib/sparsehash-2.0.3/*                                        BSD (Google)
 	Copyright (c) 2005, Google Inc.
 
 ==== Boost 1.0 Start =========================================================
