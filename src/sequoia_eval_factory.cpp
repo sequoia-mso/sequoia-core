@@ -26,6 +26,7 @@
 #include "sequoia_eval_bool.h"
 #include "sequoia_eval_witness.h"
 #include "sequoia_eval_counting.h"
+#include "sequoia_eval_cardcount.h"
 
 #include <fstream>
 #include <string>
@@ -69,6 +70,8 @@ sequoia_eval_make(const std::string &name,
         res = new WitnessEvaluation();
     } else if (name == "Counting") {
         res = new CountingEvaluation();
+    } else if (name == "CardCounting") {
+        res = new CardCountingEvaluation();
     } else {
         throw sequoia_usage_error("Unknown evaluation");
     }
