@@ -45,15 +45,15 @@ tools/.libs/
 
 nbproject/
 
-contrib/sparsehash-2.0.2/.deps/
-contrib/sparsehash-2.0.2/hashtable_test
-contrib/sparsehash-2.0.2/libc_allocator_with_realloc_test
-contrib/sparsehash-2.0.2/libsparsehash.pc
-contrib/sparsehash-2.0.2/simple_compat_test
-contrib/sparsehash-2.0.2/simple_test
-contrib/sparsehash-2.0.2/sparsetable_unittest
-contrib/sparsehash-2.0.2/src/config.h.in~
-contrib/sparsehash-2.0.2/src/sparsehash/internal/sparseconfig.h
-contrib/sparsehash-2.0.2/template_util_unittest
-contrib/sparsehash-2.0.2/time_hash_map
-contrib/sparsehash-2.0.2/type_traits_unittest
+contrib/sparsehash-2.0.3/.deps/
+contrib/sparsehash-2.0.3/hashtable_test
+contrib/sparsehash-2.0.3/libc_allocator_with_realloc_test
+contrib/sparsehash-2.0.3/libsparsehash.pc
+contrib/sparsehash-2.0.3/simple_compat_test
+contrib/sparsehash-2.0.3/simple_test
+contrib/sparsehash-2.0.3/sparsetable_unittest
+contrib/sparsehash-2.0.3/src/config.h.in~
+contrib/sparsehash-2.0.3/src/sparsehash/internal/sparseconfig.h
+contrib/sparsehash-2.0.3/template_util_unittest
+contrib/sparsehash-2.0.3/time_hash_map
+contrib/sparsehash-2.0.3/type_traits_unittest

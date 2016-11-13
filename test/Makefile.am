@@ -1,5 +1,5 @@
 DEPS=		$(top_builddir)/src/libsequoia.la
-AM_CXXFLAGS = 	-I../src -I../contrib/sparsehash-2.0.2/src 
+AM_CXXFLAGS = 	-I../src -I../contrib/sparsehash-2.0.3/src 
 AM_CPPFLAGS = 	$(BOOST_CPPFLAGS)
 AM_LDFLAGS =	-lfl -ldl \
 		$(BOOST_GRAPH_LDFLAGS) \

@@ -1,5 +1,5 @@
 AM_YFLAGS=			-d
-AM_CXXFLAGS = 			-fPIC -I../contrib/sparsehash-2.0.2/src 
+AM_CXXFLAGS = 			-fPIC -I../contrib/sparsehash-2.0.3/src 
 AM_CPPFLAGS = 			$(BOOST_CPPFLAGS)
 AM_CXXFLAGS += 			-Wno-deprecated
 #AM_CXXFLAGS +=    		-O0 -DDODEBUG -pg # debugging
