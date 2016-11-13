@@ -30,7 +30,7 @@ public:
         const sequoia::SetMove *smove = alpha->get(_free_symbols[0]);
         int size = 0;
 
-        // collect elements in this set
+        // count elements in this set
         for (unsigned int i = 0; i < _terminal_symbols.size(); ++i) {
             const sequoia::ConstantSymbol* t = _terminal_symbols[i];
             unsigned int t_num = _terminal_symbols[i]->nesting_depth()
@@ -40,7 +40,7 @@ public:
             }
         }
         value_t *res = new value_t(size+1);
-        (*res)[size] = 1;
+        (*res)[size] = 1; // 1 solution of this size
         _values.push_back(res);
         return res;
     }
@@ -71,6 +71,7 @@ public:
             long v1 = (*i1)[i];
             for (int j = is_size; j < sz_i2; j++) {            
                 long v2 = (*i2)[j];
+                // elements in the intersection are counted twice
                 (*res)[i + j - is_size] += v1 * v2;
             }
         }
