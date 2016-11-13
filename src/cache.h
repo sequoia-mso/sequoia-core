@@ -27,7 +27,7 @@
 #include "list.h"
 #include "unordered_defs.h"
 
-#include <tr1/unordered_map>
+#include <unordered_map>
 
 #ifdef HAVE_TBB
 #include <tbb/enumerable_thread_specific.h>
@@ -139,7 +139,7 @@ private:
 
     typedef List<KeyValuePair> ListImpl;
     typedef typename ListImpl::Handle ListHandle;
-    typedef typename std::tr1::unordered_map<
+    typedef typename std::unordered_map<
 	const Key*,
 	ListHandle,
 	ptr_deep_hasher<Key, Hash>,
